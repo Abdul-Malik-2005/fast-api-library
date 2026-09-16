@@ -32,7 +32,7 @@ class BookBase(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def year_not_in_future(self) -> "BookBase":
+    def year_not_in_future(self) -> BookBase:
         if self.year is not None and self.year > date.today().year:
             raise ValueError("год издания не может быть в будущем")
         return self

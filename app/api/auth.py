@@ -15,7 +15,9 @@ from app.storage import users_db
 router = APIRouter(prefix="/auth", tags=["Аутентификация"])
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+)
 def register(user_in: UserCreate) -> dict:
     """Регистрация. Пароль сразу превращается в хэш."""
     if any(u["username"] == user_in.username for u in users_db):
@@ -37,9 +39,7 @@ def register(user_in: UserCreate) -> dict:
 @router.post("/token", response_model=Token)
 def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> Token:
     """Логин: обмениваем логин+пароль на JWT (форма, не JSON)."""
-    user = next(
-        (u for u in users_db if u["username"] == form_data.username), None
-    )
+    user = next((u for u in users_db if u["username"] == form_data.username), None)
     if user is None or not verify_password(form_data.password, user["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

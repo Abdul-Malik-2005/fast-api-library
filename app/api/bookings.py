@@ -1,15 +1,15 @@
 """Бронирования: in-memory реализация (эталон экзамена У9)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Query, status
-
-from app.api.deps import AdminUser, CurrentUser, PaginationParams
 from fastapi_projects.library.app.schemas.bookings import (
     BookingCreate,
     BookingResponse,
     BookingStatus,
 )
+
+from app.api.deps import AdminUser, CurrentUser, PaginationParams
 from app.storage import bookings_db, books_db
 
 router = APIRouter(prefix="/bookings", tags=["Бронирования"])
@@ -18,7 +18,7 @@ MAX_ACTIVE_BOOKINGS = 3
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _find_booking(booking_id: int) -> dict | None:
@@ -90,7 +90,7 @@ def all_bookings(current_user: AdminUser, pagination: PaginationParams) -> list[
     """Все брони (только админ) с пагинацией."""
     offset, limit = pagination
     ordered = sorted(bookings_db, key=lambda b: b["borrow_date"], reverse=True)
-    return [_to_response(b) for b in ordered[offset: offset + limit]]
+    return [_to_response(b) for b in ordered[offset : offset + limit]]
 
 
 @router.post("/{booking_id}/return", response_model=BookingResponse)

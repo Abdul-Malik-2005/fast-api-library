@@ -25,9 +25,30 @@ users_db: list[dict] = [
 
 # --- Книги ------------------------------------------------------
 books_db: list[dict] = [
-    {"id": 1, "title": "Чистый код", "author": "Роберт Мартин", "genre": "programming", "year": 2008, "pages": 464},
-    {"id": 2, "title": "Совершенный код", "author": "Стив Макконнелл", "genre": "programming", "year": 2004, "pages": 914},
-    {"id": 3, "title": "Мастер и Маргарита", "author": "Михаил Булгаков", "genre": "fiction", "year": 1967, "pages": 480},
+    {
+        "id": 1,
+        "title": "Чистый код",
+        "author": "Роберт Мартин",
+        "genre": "programming",
+        "year": 2008,
+        "pages": 464,
+    },
+    {
+        "id": 2,
+        "title": "Совершенный код",
+        "author": "Стив Макконнелл",
+        "genre": "programming",
+        "year": 2004,
+        "pages": 914,
+    },
+    {
+        "id": 3,
+        "title": "Мастер и Маргарита",
+        "author": "Михаил Булгаков",
+        "genre": "fiction",
+        "year": 1967,
+        "pages": 480,
+    },
 ]
 
 # --- Авторы -----------------------------------------------------

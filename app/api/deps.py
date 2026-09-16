@@ -13,9 +13,7 @@ from fastapi.security import OAuth2PasswordBearer
 from app.core.config import settings
 from app.storage import users_db
 
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.api_v1_prefix}/auth/token"
-)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_prefix}/auth/token")
 
 
 def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> dict:
