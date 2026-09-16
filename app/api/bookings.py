@@ -1,6 +1,7 @@
 """Бронирования: in-memory реализация (эталон экзамена У9)."""
 
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi_projects.library.app.schemas.bookings import (
@@ -75,7 +76,7 @@ def create_booking(booking_in: BookingCreate, current_user: CurrentUser) -> dict
 @router.get("/my", response_model=list[BookingResponse])
 def my_bookings(
     current_user: CurrentUser,
-    status_filter: BookingStatus | None = Query(default=None, alias="status"),
+    status_filter: Annotated[BookingStatus | None, Query(alias="status")] = None,
 ) -> list[dict]:
     """Брони текущего пользователя, новые сверху."""
     result = [b for b in bookings_db if b["user_id"] == current_user["id"]]
