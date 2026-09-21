@@ -1,36 +1,45 @@
+-- Схема базы данных онлайн-библиотеки.
+-- Применение:  psql -U library_user -d library_db -f db/schema.sql
+-- (Linux: добавить -h localhost)
+
+-- Авторы
 CREATE TABLE IF NOT EXISTS authors (
-    id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(150) NOT NULL UNIQUE,
-    country varchar(100),
-    birth_year INTEGER CHECK (birth_year >=1000)
+    id          BIGSERIAL PRIMARY KEY,
+    name        VARCHAR(150) NOT NULL UNIQUE,
+    country     VARCHAR(100),
+    birth_year  INTEGER CHECK (birth_year >= 1800)
 );
 
-CREATE TABLE if not EXISTS books (
-    id bigserial PRIMARY KEY,
-    title varchar(200) not null unique,
-    author_id bigint not null REFERENCES authors(id) on DELETE RESTRICT,
-    genre varchar(50) not null DEFAULT 'other',
-    year integer CHECK (year >= 1450),
-    pages integer CHECK (pages > 0),
+-- Книги
+CREATE TABLE IF NOT EXISTS books (
+    id         BIGSERIAL PRIMARY KEY,
+    title      VARCHAR(200) NOT NULL,
+    author_id  BIGINT NOT NULL REFERENCES authors(id) ON DELETE RESTRICT,
+    genre      VARCHAR(50) NOT NULL DEFAULT 'other',
+    year       INTEGER CHECK (year >= 1450),
+    pages      INTEGER CHECK (pages > 0),
+    -- одна и та же книга одного автора не может существовать дважды
     UNIQUE (title, author_id)
 );
 
-
-CREATE TABLE if not EXISTS users (
-    id bigserial PRIMARY KEY,
-    username varchar(32) not null UNIQUE,
-    email varchar(254) not null UNIQUE,
-    hashed_password text not null,
-    is_admin boolean not null default false,
-    created_at timestamptz not null DEFAULT now()
+-- Пользователи
+CREATE TABLE IF NOT EXISTS users (
+    id               BIGSERIAL PRIMARY KEY,
+    username         VARCHAR(32) NOT NULL UNIQUE,
+    email            VARCHAR(254) NOT NULL UNIQUE,
+    hashed_password  TEXT NOT NULL,
+    is_admin         BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE table if not EXISTS bookings (
-    id bigserial primary key,
-    book_id bigint not null REFERENCES books(id) on delete CASCADE,
-    user_id bigint not null REFERENCES users(id) in DELETE CASCADE,
-    borrow_date timestamptz not null DEFAULT now(),
-    due_date timestamptz not null,
-    return_date timestamptz,
-    status varchar(10) not null DEFAULT 'active' CHECK (status IN ('active', 'returned'))
+-- Бронирования (помнишь первый экзамен? Теперь они вечные)
+CREATE TABLE IF NOT EXISTS bookings (
+    id           BIGSERIAL PRIMARY KEY,
+    book_id      BIGINT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    borrow_date  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    due_date     TIMESTAMPTZ NOT NULL,
+    return_date  TIMESTAMPTZ,
+    status       VARCHAR(10) NOT NULL DEFAULT 'active'
+                 CHECK (status IN ('active', 'returned'))
 );
