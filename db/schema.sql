@@ -43,3 +43,4 @@ CREATE TABLE IF NOT EXISTS bookings (
     status       VARCHAR(10) NOT NULL DEFAULT 'active'
                  CHECK (status IN ('active', 'returned'))
 );
+
