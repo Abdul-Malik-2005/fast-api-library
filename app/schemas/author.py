@@ -1,6 +1,6 @@
 """Pydantic-схемы для авторов."""
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class AuthorCreate(BaseModel):
@@ -17,5 +17,6 @@ class AuthorCreate(BaseModel):
         return value
 
 
-class AuthorResponse(AuthorCreate):
+class AuthorResponse(BaseModel):
     id: int
+    model_config = ConfigDict(from_attributes=True)

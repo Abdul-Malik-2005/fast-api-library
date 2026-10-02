@@ -10,13 +10,15 @@ from fastapi_projects.library.app.schemas.bookings import (
     BookingStatus,
 )
 
-from app.api.deps import AdminUser, CurrentUser, PaginationParams
+from sqlalchemy import select
+
+from app.api.deps import AdminUser, CurrentUser, PaginationParams, DbSession
+from app.models import Book
 from app.storage import bookings_db, books_db
 
 router = APIRouter(prefix="/bookings", tags=["Бронирования"])
 
 MAX_ACTIVE_BOOKINGS = 3
-
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -41,10 +43,11 @@ def _to_response(booking: dict) -> dict:
 
 
 @router.post("", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
-def create_booking(booking_in: BookingCreate, current_user: CurrentUser) -> dict:
+def create_booking(booking_in: BookingCreate, current_user: CurrentUser, db: DbSession) -> dict:
     """Бронирование с проверкой всех бизнес-правил."""
-    if not any(b["id"] == booking_in.book_id for b in books_db):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Книга не найдена")
+    book_exists = db.scalar(select(Book.id).where(Book.id == booking.book_id)) is not None
+    if not book_exists:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Книга не найдена")
     if _is_book_busy(booking_in.book_id):
         raise HTTPException(status.HTTP_409_CONFLICT, "Книга уже забронирована")
 

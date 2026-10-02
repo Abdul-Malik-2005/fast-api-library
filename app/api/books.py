@@ -1,121 +1,131 @@
-"""Роутер для работы с книгами. Данные — в памяти (до У13)."""
-
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
 
-from app.api.deps import AdminUser, CurrentUser, PaginationParams
-from app.schemas.book import BookCreate, BookResponse, BookUpdate, Genre
-from app.storage import books_db
+from app.api.deps import AdminUser, CurrentUser, DbSession, PaginationParams
+from app.models import Author, Book
+from app.schemas.book import BookCreate, BookResponse, BookUpdate
 
 router = APIRouter(prefix="/books", tags=["Книги"])
 
-
 def _notify(message: str) -> None:
-    """Имитация фонового действия."""
     print(f"[background] {message}")
 
+def _book_to_dict(book: Book) -> dict:
+    return {
+        "id": book.id,
+        "title": book.title,
+        "author": book.author.name,
+        "genre": book.genre,
+        "year": book.year,
+        "pages": book.pages,
+    }
 
-def _find_book(book_id: int) -> dict | None:
-    for book in books_db:
-        if book["id"] == book_id:
-            return book
-    return None
-
+def _get_or_create_author(db: DbSession, name: str) -> Author:
+    author = db.scalar(select(Author).where(Author.name == name))
+    if author is None:
+        author = Author(name=name)
+        db.add(author)
+        db.flush()
+    return author
 
 @router.get("", response_model=list[BookResponse])
 def get_books(
+    db: DbSession,
     pagination: PaginationParams,
     search: str | None = None,
-    genre: Genre | None = None,
 ) -> list[dict]:
-    """Список книг с поиском, фильтром по жанру и пагинацией."""
-    result = books_db
+    stmt = select(Book).options(joinedload(Book.author))
 
     if search is not None:
-        search_lower = search.lower()
-        result = [
-            book
-            for book in result
-            if search_lower in book["title"].lower()
-            or search_lower in book["author"].lower()
-        ]
-    if genre is not None:
-        result = [book for book in result if book["genre"] == genre.value]
+        stmt = stmt.where(Book.title.ilike(f"%{search}"))
 
     offset, limit = pagination
-    return result[offset : offset + limit]
+    stmt = stmt.order_by(Book.id).offset(offset).limit(limit)
+
+    books = db.scalar(stmt).all()
+    return [_book_to_dict(book) for book in books]
 
 
 @router.get("/{book_id}", response_model=BookResponse)
-def get_book(book_id: int) -> dict:
-    """Одна книга по её id."""
-    book = _find_book(book_id)
+def get_book(book_id: int, db: DbSession) -> dict:
+    book = db.get(Book, book_id, options=[joinedload(Book.author)])
     if book is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Книга с id={book_id} не найдена",
         )
-    return book
+    return _book_to_dict(book)
 
 
 @router.post("", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
 def create_book(
     book: BookCreate,
+    db: DbSession,
     current_user: CurrentUser,
     background_tasks: BackgroundTasks,
 ) -> dict:
-    """Создание книги + защита от дублей + фоновое уведомление."""
-    duplicate = any(
-        b["title"].lower() == book.title.lower()
-        and b["author"].lower() == book.author.lower()
-        for b in books_db
+    author = _get_or_create_author(db, book.author)
+    new_book = Book(
+        title=book.title,
+        author=author,
+        genre=book.genre.value,
+        year=book.year,
+        pages=book.pages,
     )
-    if duplicate:
+    db.add(new_book)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Такая книга у этого автора уже есть",
         )
 
-    new_id = max((b["id"] for b in books_db), default=0) + 1
-    new_book = {"id": new_id, **book.model_dump()}
-    books_db.append(new_book)
-
     background_tasks.add_task(
         _notify,
-        f"Пользователь {current_user['username']} добавил книгу «{book.title}»",
+        f"Пользователь {current_user['username']} добавил книгу '{book.title}'",
     )
-    return new_book
+    return _book_to_dict(new_book)
 
 
 @router.put("/{book_id}", response_model=BookResponse)
-def update_book(book_id: int, update: BookUpdate, current_user: CurrentUser) -> dict:
-    """Обновление только присланных полей (exclude_unset)."""
-    book = _find_book(book_id)
+def update_book(book_id: int, update: BookUpdate, db: DbSession, current_user: CurrentUser) -> dict:
+    book = db.get(Book, book_id)
     if book is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Книга с id={book_id} не найдена",
         )
-
     update_data = update.model_dump(exclude_unset=True)
     if not update_data:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Не передано ни одного поля для обновления",
+            detail="Не найдено ни одного поля для обновления",
         )
+    if "author" in update_data:
+        book.author = _get_or_create_author(db, update_data.pop("author"))
+        if "genre" in update_data and update_data["genre"] is not None:
+            update_data["genre"] = update_data["genre"].value
 
-    book.update(update_data)
-    return book
+        for field, value in update_data.items():
+            setattr(book, field, value)
+        db.commit()
+        return _book_to_dict(book)
 
 
 @router.delete("/{book_id}")
-def delete_book(book_id: int, current_user: AdminUser) -> dict:
-    """Удаление книги: только для администраторов."""
-    for index, book in enumerate(books_db):
-        if book["id"] == book_id:
-            books_db.pop(index)
-            return {"message": f"Книга с id={book_id} удалена"}
+def delete_book(book_id: int, db: DbSession, current_user: AdminUser) -> dict:
+    book = db.get(Book, book_id)
+    if book is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Книга с id={book_id} не найдена",
+        )
+    db.delete(book)
+    db.commit()
 
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Книга не найдена",
-    )
+    return {"message": f"Книга с id={book_id} удалена"}
+

@@ -1,32 +1,30 @@
-"""Роутер авторов."""
+"""Роутер авторов. Данные — в PostgreSQL."""
 
 from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import select
 
-from app.api.deps import PaginationParams
+from app.api.deps import DbSession, PaginationParams
+from app.models import Author
 from app.schemas.author import AuthorResponse
-from app.storage import authors_db
 
 router = APIRouter(prefix="/authors", tags=["Авторы"])
 
 
-def _find_author(author_id: int) -> dict | None:
-    for author in authors_db:
-        if author["id"] == author_id:
-            return author
-    return None
-
-
 @router.get("", response_model=list[AuthorResponse])
-def get_authors(pagination: PaginationParams) -> list[dict]:
-    """Список авторов с пагинацией."""
+def get_authors(db: DbSession, pagination: PaginationParams) -> list[Author]:
+    """Список авторов.
+
+    Здесь можно вернуть сами ORM-объекты: поля схемы совпадают
+    с колонками (в У14 добавим моделям режим совместимости).
+    """
     offset, limit = pagination
-    return authors_db[offset : offset + limit]
+    stmt = select(Author).order_by(Author.id).offset(offset).limit(limit)
+    return list(db.scalars(stmt).all())
 
 
 @router.get("/{author_id}", response_model=AuthorResponse)
-def get_author(author_id: int) -> dict:
-    """Один автор по id."""
-    author = _find_author(author_id)
+def get_author(author_id: int, db: DbSession) -> Author:
+    author = db.get(Author, author_id)
     if author is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -4,9 +4,10 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-
-from app.api.deps import require_admin
-from app.storage import authors_db, books_db, users_db
+from sqlalchemy import func, select
+from app.api.deps import require_admin, DbSession
+from app.storage import users_db
+from app.models import Author, Book
 
 router = APIRouter(
     prefix="/admin",
@@ -16,11 +17,11 @@ router = APIRouter(
 
 
 @router.get("/stats")
-def stats() -> dict:
+def stats(db: DbSession) -> dict:
     """Сводная статистика библиотеки."""
     return {
-        "books": len(books_db),
-        "authors": len(authors_db),
+        "books": db.scalar(select(func.count()).select_from(Book)),
+        "authors": db.scalar(select(func.count).select_from(Author)),
         "users": len(users_db),
     }
 

@@ -12,8 +12,11 @@ from fastapi.security import OAuth2PasswordBearer
 
 from app.core.config import settings
 from app.storage import users_db
+from sqlalchemy.orm import Session
+from app.core.db import get_db
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_prefix}/auth/token")
+DbSession = Annotated[Session, Depends(get_db)]
 
 
 def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> dict:
